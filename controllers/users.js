@@ -19,7 +19,7 @@ module.exports.createUser = (req, res, next) => {
     })
       .then((user) => {
         if (!user) {
-          throw new RequestError('Что-то не так с данными пользователя')
+          throw new RequestError('Что-то не так с данными пользователя');
         }
         res.status(201).send({
           _id: user._id,
@@ -47,22 +47,17 @@ module.exports.login = (req, res, next) => {
         sameSite: true,
       }).send({ message: 'Ок' });
     })
-    // .catch((err) => {
-    //   res.status(401).send({ message: err.message });
-    // });
     .catch(next);
 };
 
 module.exports.getAllUsers = (req, res, next) => {
   User.find({})
     .then((users) => res.send({ data: users }))
-    // .catch(() => res.status(500).send({ message: 'Произошла ошибка при поиске всех пользователей' }));
     .catch(next);
 };
 
 module.exports.getSingleUser = (req, res, next) => {
   User.findById(req.params.id)
     .then((user) => res.send({ data: user }))
-    // .catch(() => res.status(500).send({ message: 'Нет пользователя с таким id' }));
     .catch(next);
 };
