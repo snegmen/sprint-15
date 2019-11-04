@@ -5,16 +5,20 @@ const User = require('../models/user');
 const { NODE_ENV, JWT_SECRET } = process.env;
 
 // eslint-disable-next-line consistent-return
-module.exports.createUser = (req, res) => {
+module.exports.createUser = (req, res, next) => {
   if (Object.keys(req.body).length === 0) return res.status(400).send({ message: 'Тело запроса пустое' });
   const {
     name, about, avatar, email, password,
   } = req.body;
+
   bcrypt.hash(password, 10)
     .then((hash) => User.create({
       name, about, avatar, email, password: hash,
     })
       .then((user) => {
+        if (!user) {
+          throw new RequestError('Что-то не так с данными пользователя');
+        }
         res.status(201).send({
           _id: user._id,
           email: user.email,
@@ -23,7 +27,7 @@ module.exports.createUser = (req, res) => {
           avatar: user.avatar,
         });
       })
-      .catch(() => res.status(400).send({ message: 'Произошла ошибка при создании пользователя' })));
+      .catch(next));
 };
 
 module.exports.login = (req, res) => {
