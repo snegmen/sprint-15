@@ -1,5 +1,6 @@
 const Card = require('../models/card');
 const Error500 = require('../errors/500-err');
+const NotFoundError = require('../errors/not-found-err');
 
 module.exports.createCard = (req, res, next) => {
   const { name, link } = req.body;
@@ -19,11 +20,14 @@ module.exports.deleteCard = (req, res, next) => {
   Card.findById(req.params.id)
     // eslint-disable-next-line consistent-return
     .then((card) => {
-      if (!card) return Promise.reject(new Error('Такой карты нет'));
-      if (JSON.stringify(card.owner) !== JSON.stringify(req.user._id)) return Promise.reject(new Error('Карта не ваша! Удалить нельзя!'));
+      if (JSON.stringify(card.owner) !== JSON.stringify(req.user._id)) {
+        const notCardOwner = new Error('Карта не ваша! Удалить нельзя!');
+        notCardOwner.statusCode = 403;
+        throw notCardOwner;
+      }
       Card.remove(card)
-        .then((cardToDelete) => res.send(cardToDelete !== null ? { data: card } : { data: 'Нечего удалять' }))
-        .catch(() => { throw new Error500('Ошибка при удалении карты') });
+        .then((cardToDelete) => res.send(cardToDelete !== null ? { data: card } : { data: 'Nothing to delete' }))
+        .catch(() => { throw new Error500('Ошибка при удалении карты'); });
     })
-    .catch((err) => next(err.statusCode ? err : new Error404('Такой карты нет')));
+    .catch((err) => next(err.statusCode ? err : new NotFoundError('Такой карты нет')));
 };

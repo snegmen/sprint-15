@@ -1,8 +1,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
-const RequestError = require('../errors/req-err');
-const AuthError = require('../errors/auth-err');
+const Error500 = require('../errors/500-err');
+const NotFoundError = require('../errors/not-found-err');
 
 const { NODE_ENV, JWT_SECRET } = process.env;
 
@@ -12,34 +12,24 @@ module.exports.createUser = (req, res, next) => {
   const {
     name, about, avatar, email, password,
   } = req.body;
-
   bcrypt.hash(password, 10)
     .then((hash) => User.create({
       name, about, avatar, email, password: hash,
     })
-      .then((user) => {
-        if (!user) {
-          throw new RequestError('Что-то не так с данными пользователя');
-        }
-        res.status(201).send({
-          _id: user._id,
-          email: user.email,
-          name: user.name,
-          about: user.about,
-          avatar: user.avatar,
-        });
-      })
-      .catch(next));
+      .then((user) => res.status(201).send({
+        _id: user._id, name: user.name, about: user.about, email: user.email,
+      }))
+      .catch(() => {
+        const err = new Error('Ошибка создания пользователя');
+        err.statusCode = 400;
+        next(err);
+      }));
 };
 
 module.exports.login = (req, res, next) => {
   const { email, password } = req.body;
-
   return User.findUserByCredentials(email, password)
     .then((user) => {
-      if (!user) {
-        throw new AuthError('Ошибка авторизации');
-      }
       const token = jwt.sign({ _id: user._id }, NODE_ENV === 'production' ? JWT_SECRET : 'dev-secret', { expiresIn: '7d' });
       res.status(201).cookie('jwt', token, {
         maxAge: 3600000 * 24 * 7,
@@ -47,17 +37,24 @@ module.exports.login = (req, res, next) => {
         sameSite: true,
       }).send({ message: 'Ок' });
     })
-    .catch(next);
+    .catch((e) => {
+      const err = new Error(e.message);
+      err.statusCode = 401;
+      next(err);
+    });
 };
 
 module.exports.getAllUsers = (req, res, next) => {
   User.find({})
     .then((users) => res.send({ data: users }))
-    .catch(next);
+    .catch(() => next(new Error500('Произошла ошибка при чтении списка пользователей')));
 };
 
 module.exports.getSingleUser = (req, res, next) => {
   User.findById(req.params.id)
-    .then((user) => res.send({ data: user }))
-    .catch(next);
+    .then((user) => {
+      if (!user) throw Error;
+      res.send({ data: user });
+    })
+    .catch(() => next(new NotFoundError('Нет пользователя с таким id')));
 };

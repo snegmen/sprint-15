@@ -29,9 +29,6 @@ mongoose.connect('mongodb://localhost:27017/mestodb', {
   useUnifiedTopology: true,
 });
 
-// app.post('/signup', createUser);
-
-// app.post('/signin', login);
 app.use(requestLogger);
 
 app.get('/crash-test', () => {
@@ -40,6 +37,16 @@ app.get('/crash-test', () => {
   }, 0);
 });
 
+app.post('/signup', celebrate({
+  body: Joi.object().keys({
+    password: Joi.string().required().min(8),
+    email: Joi.string().email().required(),
+    name: Joi.string().min(2).max(30).required(),
+    avatar: Joi.string().uri().required(),
+    about: Joi.string().min(2).max(30).required(),
+  }),
+}), createUser);
+
 app.post('/signin', celebrate({
   body: Joi.object().keys({
     email: Joi.string().required().email(),
@@ -47,24 +54,11 @@ app.post('/signin', celebrate({
   }),
 }), login);
 
-app.post('/signup', celebrate({
-  body: Joi.object().keys({
-    name: Joi.string().required().min(2).max(30),
-    about: Joi.string().required().min(2).max(30),
-    avatar: Joi.string().required().regex(/^((http|https)):\/\/(www\.)?((\d{3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d{1,5})?)|([A-z]+(\.[\w-]+)?\.[A-z]{2,4}))(\/[\w-\/]+)?#?/),
-    email: Joi.string().required().email(),
-    password: Joi.string().required().min(8),
-  }),
-  query: {
-    token: Joi.string().token().required(),
-  },
-}), createUser);
-
 app.use(auth);
 
 app.use('/users', usersRoute);
 app.use('/cards', cardsRoute);
-app.get('*', (req, res, next) => {
+app.use('*', (req, res, next) => {
   next(new NotFoundError('Ресурс не найден'));
 });
 
@@ -72,16 +66,10 @@ app.use(errorLogger);
 
 app.use(errors());
 
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  const { statusCode = 500, message } = err;
-
-  res
-    .status(statusCode)
-    .send({
-      message: statusCode === 500
-        ? 'На сервере произошла ошибка'
-        : message,
-    });
+  res.status(err.statusCode ? err.statusCode : 500)
+    .send({ message: err.message });
 });
 
 app.listen(PORT, () => {
