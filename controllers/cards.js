@@ -1,28 +1,33 @@
 const Card = require('../models/card');
+const Error500 = require('../errors/500-err');
+const NotFoundError = require('../errors/not-found-err');
 
-module.exports.createCard = (req, res) => {
+module.exports.createCard = (req, res, next) => {
   const { name, link } = req.body;
   Card.create({ name, link, owner: req.user._id })
     .then((card) => res.send({ data: card }))
-    .catch((err) => res.status(500).send({ message: `Произошла ошибка при создании карточки -- ${err}` }));
+    .catch((err) => next(new Error500(`Ошибка при создании карточки -- ${err.message}`)));
 };
 
-module.exports.getAllCards = (req, res) => {
+module.exports.getAllCards = (req, res, next) => {
   Card.find({})
     .populate('owner')
     .then((cards) => res.send({ data: cards }))
-    .catch(() => res.status(500).send({ message: 'Произошла ошибка при поиске карточек' }));
+    .catch(() => next(new Error500('Ошибка при чтении всех карточек')));
 };
 
-module.exports.deleteCard = (req, res) => {
+module.exports.deleteCard = (req, res, next) => {
   Card.findById(req.params.id)
     // eslint-disable-next-line consistent-return
     .then((card) => {
-      if (!card) return Promise.reject(new Error('Такой карты нет'));
-      if (JSON.stringify(card.owner) !== JSON.stringify(req.user._id)) return Promise.reject(new Error('Карта не ваша! Удалить нельзя!'));
+      if (JSON.stringify(card.owner) !== JSON.stringify(req.user._id)) {
+        const notCardOwner = new Error('Карта не ваша! Удалить нельзя!');
+        notCardOwner.statusCode = 403;
+        throw notCardOwner;
+      }
       Card.remove(card)
-        .then((cardToDelete) => res.send(cardToDelete !== null ? { data: card } : { data: 'Нечего удалять' }))
-        .catch(() => res.status(500).send({ message: 'Произошла ошибка при удалении карточки' }));
+        .then((cardToDelete) => res.send(cardToDelete !== null ? { data: card } : { data: 'Nothing to delete' }))
+        .catch(() => { throw new Error500('Ошибка при удалении карты'); });
     })
-    .catch(() => res.status(500).send({ message: 'Произошла ошибка при удалении карточки' }));
+    .catch((err) => next(err.statusCode ? err : new NotFoundError('Такой карты нет')));
 };
